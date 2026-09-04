@@ -9,6 +9,17 @@ description: What's new in AI Brain Starter — plain English, no jargon
 
 ---
 
+## 2026-09-04: wikilinks stop pointing at generated files and at themselves
+
+**Who this affects:** anyone who runs `/graphify` and lets it apply wikilinks.
+
+Two links were being written that no one would write by hand:
+
+- **Links into graphify's own output.** The pass walked `graphify-out/`, so it edited `GRAPH_REPORT.md` and `WIKILINK_GAPS.md` — files the next run overwrites anyway — and left the gap report linking its own table rows.
+- **Notes linking to themselves.** A note whose title matched the link target got a link back to the page you are already reading, and a self-loop in the graph.
+
+---
+
 ## 2026-09-02: /graphify can now show you what its typed edges would do, before they do it
 
 **Who this affects:** anyone running `/graphify` on a vault with frontmatter and wikilinks — so, anyone whose graph is built from notes rather than code.
