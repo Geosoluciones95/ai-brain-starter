@@ -41,6 +41,24 @@ from _floors import floor_num_from_fm  # noqa: E402
 # load_vault_index() below must survive a cloud placeholder / stalled mount /
 # FIFO, and scripts/check-cloud-safe-file-walkers.py refuses to trust
 # anything else. Same convention as scripts/build-journal-index.py.
+#
+# This script is ALSO run from a bare copy of scripts/ that has no sibling
+# hooks/ dir: tests/integration/test_extractors_localized_vault.sh makes "a
+# private copy of scripts/" (its own words) to prove the tree still works when
+# it is a plain copy, not the repo checkout — the same shape a real deploy
+# would hand this script. `../hooks` does not exist there, so this import used
+# to die with `ModuleNotFoundError: No module named '_lib'`, exactly the
+# failure build-journal-index.py hit before scripts/sync-vault-scripts.sh
+# started mirroring hooks/_lib/{__init__,safe_read}.py alongside it. That sync
+# only mirrors scripts/ FILENAMES (VAULT_SCRIPTS), which cannot express a
+# package directory, and this script isn't in that manifest anyway — so the
+# mirror instead lives at scripts/extractors/_lib/ (a byte-identical copy of
+# hooks/_lib/__init__.py + safe_read.py), inside the one directory this
+# script's own sys.path entry above already guarantees travels with any copy.
+# The real hooks/_lib wins whenever it exists (its sys.path entry is inserted
+# after, so it lands first); the extractors/_lib mirror only activates when
+# ../hooks is entirely absent. Keep the mirror byte-identical to hooks/_lib —
+# diff the two if hooks/_lib/safe_read.py ever changes.
 sys.path.insert(0, os.path.join(HERE, "..", "hooks"))
 from _lib.safe_read import safe_read_text  # noqa: E402
 
