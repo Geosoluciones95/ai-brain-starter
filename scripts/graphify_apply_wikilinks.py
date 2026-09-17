@@ -63,6 +63,19 @@ import sys
 from datetime import date
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
+# Reach the ONE audited safe_read primitive rather than a local reader: the
+# recursive vault-wide rglob below must survive a cloud placeholder / stalled
+# mount / FIFO, and scripts/check-cloud-safe-file-walkers.py refuses to trust
+# anything else (its own negative control is "bogus safe_read module is not
+# trusted"). Same convention as scripts/build-journal-index.py.
+from _lib.safe_read import safe_read_text  # noqa: E402
+
+# Read bounds for the shared safe_read primitive. A vault note is nowhere
+# near 1 MB; anything larger is skipped rather than blocking the walk.
+READ_TIMEOUT = 5.0
+MAX_NOTE_BYTES = 1_000_000
+
 SKIP_PARTS = {
     "⚙️ Meta", "Archive", "🗄 Archive", "_review_alternate_drafts",
     ".claude", ".git", ".obsidian", ".trash", "node_modules", "worktrees",
@@ -176,10 +189,12 @@ def collect_mentions(
     for md in files:
         if any(part in SKIP_PARTS for part in md.parts):
             continue
-        try:
-            text = md.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
+        result = safe_read_text(
+            md, timeout=READ_TIMEOUT, max_bytes=MAX_NOTE_BYTES, errors="ignore"
+        )
+        if not result.ok:
             continue
+        text = result.text
 
         # Strip wikilink markup for cleaner quotes: [[X|Y]] → Y, [[X]] → X
         clean = re.sub(r'\[\[(?:[^\]|]+\|)?([^\]]+)\]\]', r'\1', text)
@@ -353,7 +368,13 @@ type: concept
 
 def load_report(report_path: Path) -> list[dict]:
     terms = []
-    for line in report_path.read_text(encoding="utf-8").splitlines():
+    result = safe_read_text(
+        report_path, timeout=READ_TIMEOUT, max_bytes=MAX_NOTE_BYTES, errors="ignore"
+    )
+    if not result.ok:
+        print(f"  ⚠ could not read {report_path}: {result.status}")
+        return terms
+    for line in result.text.splitlines():
         if not line.startswith("|"):
             continue
         parts = [p.strip() for p in line.strip("|").split("|")]
@@ -441,10 +462,12 @@ def find_contexts(vault: Path, search_term: str, max_results: int = 2) -> list[t
     for md in vault.rglob("*.md"):
         if any(part in SKIP_PARTS for part in md.parts):
             continue
-        try:
-            text = md.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
+        result = safe_read_text(
+            md, timeout=READ_TIMEOUT, max_bytes=MAX_NOTE_BYTES, errors="ignore"
+        )
+        if not result.ok:
             continue
+        text = result.text
         protected = _collect_protected_spans(text)
         for m in pattern.finditer(text):
             if _in_protected_span(m.start(), m.end(), protected):
@@ -482,10 +505,12 @@ def apply_wikilink(vault: Path, search_term: str, link_target: str, display: str
         # you are already reading, and adds a self-loop to the graph.
         if md.stem.casefold() == link_target.casefold():
             continue
-        try:
-            text = md.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
+        result = safe_read_text(
+            md, timeout=READ_TIMEOUT, max_bytes=MAX_NOTE_BYTES, errors="ignore"
+        )
+        if not result.ok:
             continue
+        text = result.text
         protected = _collect_protected_spans(text)
         for m in pattern.finditer(text):
             if _in_protected_span(m.start(), m.end(), protected):
