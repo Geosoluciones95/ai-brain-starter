@@ -36,6 +36,14 @@ if _REAL_EXTRACTORS not in sys.path:
 from _base import VAULT, SKIP_PARTS, iso_date_from  # noqa: E402
 from _floors import floor_num_from_fm  # noqa: E402
 
+# scripts/ -> repo root -> hooks/_lib. Reach the ONE audited safe_read
+# primitive rather than a local reader: the recursive vault-wide glob in
+# load_vault_index() below must survive a cloud placeholder / stalled mount /
+# FIFO, and scripts/check-cloud-safe-file-walkers.py refuses to trust
+# anything else. Same convention as scripts/build-journal-index.py.
+sys.path.insert(0, os.path.join(HERE, "..", "hooks"))
+from _lib.safe_read import safe_read_text  # noqa: E402
+
 # Insight report location: override with INSIGHTS_OUTPUT env var.
 # Default: picks the first folder that exists: ⚙️ Meta, Meta, else vault root.
 def _default_output_path():
@@ -64,17 +72,15 @@ def _load_self_reference_names():
         return set(filter(None, (n.strip() for n in env.split(","))))
     config_path = os.path.join(VAULT, "⚙️ Meta", "self-reference-names.txt")
     if os.path.isfile(config_path):
-        try:
-            with open(config_path, encoding="utf-8") as fh:
-                names = set()
-                for raw in fh:
-                    line = raw.strip()
-                    if not line or line.startswith("#"):
-                        continue
-                    names.add(line)
-                return names
-        except OSError:
-            pass
+        result = safe_read_text(config_path, timeout=5.0, max_bytes=1_000_000, errors="replace")
+        if result.ok:
+            names = set()
+            for raw in result.text.splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                names.add(line)
+            return names
     return set()
 
 
@@ -156,15 +162,21 @@ def load_scope_paths(scope_file):
     """Load newline-delimited file paths from a scope file. Returns set of absolute paths."""
     if not scope_file:
         return None
+    result = safe_read_text(scope_file, timeout=5.0, max_bytes=1_000_000, errors="replace")
+    if not result.ok:
+        # Fail loud, not a silent no-op: a scope file that cannot be read must
+        # not quietly fall back to "unscoped" — that would silently widen
+        # every finding below to the whole vault instead of the caller's
+        # intended slice.
+        sys.exit(f"ERROR: could not read scope file {scope_file}: {result.status}")
     paths = set()
-    with open(scope_file, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if not os.path.isabs(line):
-                line = os.path.join(VAULT, line)
-            paths.add(os.path.normpath(line))
+    for line in result.text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if not os.path.isabs(line):
+            line = os.path.join(VAULT, line)
+        paths.add(os.path.normpath(line))
     return paths
 
 
@@ -175,11 +187,10 @@ def load_vault_index():
         parts = set(fp.split(os.sep))
         if parts & SKIP_PARTS:
             continue
-        try:
-            with open(fp, "r", encoding="utf-8") as f:
-                content = f.read()
-        except Exception:
+        result = safe_read_text(fp, timeout=5.0, max_bytes=1_000_000, errors="replace")
+        if not result.ok:
             continue
+        content = result.text
         if not content.startswith("---"):
             continue
         end = content.find("\n---", 3)
