@@ -9,7 +9,9 @@ scan. Cached per-run. Dormant flag = last mention >180 days ago.
 import glob
 import os
 import re
+import sys
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 import yaml
 
@@ -17,6 +19,13 @@ from _base import (
     VAULT, SKIP_PARTS, iso_date_from, extract_section, wikilinks_in,
     ExtractionResult,
 )
+
+# extractors/ -> scripts/ -> repo root -> hooks/_lib. Reach the ONE audited
+# safe_read primitive rather than a local reader: the recursive vault-wide
+# glob below must survive a cloud placeholder / stalled mount / FIFO, and
+# scripts/check-cloud-safe-file-walkers.py refuses to trust anything else.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "hooks"))
+from _lib.safe_read import safe_read_text  # noqa: E402
 
 AUTO_FIELDS = (
     "concept_domain", "concept_related", "concept_first_seen_iso",
@@ -41,11 +50,10 @@ def _build_backlink_index():
         parts = set(fp.split(os.sep))
         if parts & SKIP_PARTS:
             continue
-        try:
-            with open(fp, "r", encoding="utf-8") as f:
-                content = f.read()
-        except Exception:
+        result = safe_read_text(fp, timeout=5.0, max_bytes=1_000_000, errors="replace")
+        if not result.ok:
             continue
+        content = result.text
 
         file_date = None
         if content.startswith("---"):
