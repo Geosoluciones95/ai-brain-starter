@@ -1207,6 +1207,8 @@ echo "==> (e2b) hook activation: $PY scripts/check-hook-activation.py"
 "$PY" scripts/check-sessionstart-emit-shape.py
 "$PY" scripts/check-frozen-before-state.py --self-test >/dev/null
 "$PY" scripts/check-frozen-before-state.py
+"$PY" scripts/check-vendored-lib-in-sync.py --self-test >/dev/null
+"$PY" scripts/check-vendored-lib-in-sync.py
 "$PY" scripts/check-split-meta.py --self-test
 "$PY" scripts/check-hook-parity.py --self-test >/dev/null
 "$PY" scripts/check-hook-parity.py
