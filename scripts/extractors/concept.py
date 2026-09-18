@@ -90,11 +90,16 @@ def _domain_from_path(fp):
         "📝 Notes": "notes", "🌱 Curiosities": "curiosities",
         "🏫 School": "school", "📚 Books": "books", "🧠 Psychology": "psychology",
         "💼 Business": "business",
-        # Spanish counterparts of the six folders above. The setup interview
-        # creates LOCALIZED folder names on a non-English install, and an
-        # English-only mapping returns None for every note in them — so
-        # `concept_domain` comes out empty for the whole vault, silently, and
-        # every downstream grouping by domain sees one undifferentiated blob.
+        # Spanish counterparts of the six folders above. Folder creation in
+        # phases/phase-02-03-plugins-folders.md is English-only — but
+        # phase-01-welcome.md separately tells the setup interview to
+        # translate folder names "where idiomatic" on a non-English vault,
+        # naming 📚 Libros/ and 📝 Notas/ as its own examples — so a user may
+        # end up with these folders even though no phase hardcodes all six.
+        # Either way, an English-only mapping returns None for every note in
+        # them — so `concept_domain` comes out empty for the whole vault,
+        # silently, and every downstream grouping by domain sees one
+        # undifferentiated blob.
         "📝 Notas": "notes", "🌱 Curiosidades": "curiosities",
         "🏫 Escuela": "school", "📚 Libros": "books",
         "🧠 Psicología": "psychology", "💼 Negocios": "business",
