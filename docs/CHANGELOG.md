@@ -9,6 +9,24 @@ description: What's new in AI Brain Starter — plain English, no jargon
 
 ---
 
+## 2026-09-13: dates with slashes were merging unrelated notes in the graph
+
+**Who this affects:** anyone whose vault is not in English — Spanish, Portuguese, French and German all write dates as DD/MM/YYYY.
+
+`graphify_canonicalize.py` collapses path-form wikilinks so that `[[Curiosities/Colombia]]` and `[[Colombia]]` end up as one node. It did that by keeping whatever follows the last `/`.
+
+In English that is safe, because a `/` in a label is a path. In Spanish it is also the date separator and the rate separator, so `Sesion del 24/08/2026` became `2026` and `$49/mes` became `mes`.
+
+**The consequence is not a cosmetic one.** Every dated note in the corpus canonicalized onto the *same* node, and merging them made them all neighbours of each other. On an 8,858-node Spanish vault that produced 12 supernodes holding **119 edges that appear in no source document**. `2026` came out as the #7 god node with 31 edges, joining notes with nothing in common. Community detection and the "surprising connections" report both read those edges and neither can tell them from real ones.
+
+The fix is one rule: **a digit immediately before the `/` means it is not a folder path**, plus a small set of unit tails for the `$49/mes` shape. Real path-form wikilinks still collapse exactly as before.
+
+Regression test in `tests/test_graphify_canonicalize_slash_guard.py`. It fails on all six shapes against the previous code.
+
+If you already have a graph built from a non-English vault, the bad nodes are still in it — they are the bare years, day numbers and unit words near the top of your god-node list. Rebuild, or delete those nodes and re-cluster.
+
+---
+
 ## 2026-09-10: daily maintenance was quietly not running — two bugs, both silent
 
 **Who this affects:** everyone. `vault-daily-maintenance.sh` runs from a LaunchAgent and is what keeps your aggregated files current and your deferred close artifacts committed.
@@ -53,6 +71,14 @@ Two places assumed English text and, when they did not find it, wrote a wrong va
 
 - **Concept domains came out empty.** The folder-to-domain map listed only the English folder names, so on a Spanish-language vault using `📝 Notas` or `📚 Libros`, every note returned no domain at all. The Spanish names are now mapped to the same six domains.
 - **WhatsApp reciprocity was inverted.** The exporter labels your own messages in your phone's language, so on a Spanish handset every message you SENT was counted as one you received: your side read as zero and the chat looked one-sided. Common labels are now recognised, and `WHATSAPP_SELF_LABEL` pins one the list misses.
+
+---
+
+## 2026-09-04: the insight report stops misstating its own cutoffs
+
+**Who this affects:** anyone who runs the vault insight engine.
+
+The lucky-charm and drag-people sections tune their floor cutoffs to your own vault — the top and bottom quartile of the floors you actually write. The captions above those lists said "≥12 (Acceptance or above)" and "≤6 (Desire and below)" no matter what, which are only the fallback numbers used when a vault has too few entries to compute a quartile. So the report contradicted the baseline table printed a few lines above it, which was already showing your real p25 and p75. The captions now print the cutoff that was actually used.
 
 ---
 
